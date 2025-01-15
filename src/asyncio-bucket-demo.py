@@ -1,11 +1,26 @@
 #!/usr/bin/python3 -Wall
 
 import asyncio
+import functools
 import random
 
 
+def log_when_starts(func):
+    """ A decorator that prints details (name, arguments)
+        when the decorated function is called.
+    """
+    @functools.wraps(func)
+    def log_wrapper(*args, **kwargs):
+        all_args = [repr(a) for a in args]
+        all_args += [f"{name}={repr(val)}" for name, val in kwargs.items()]
+        all_args_str = ", ".join(all_args)
+        print(f"{func.__name__}({all_args_str}) starting")
+        return func(*args, **kwargs)
+    return log_wrapper
+
+
+@log_when_starts
 async def worker(val: int) -> int:
-    print(f"starting worker {val}")
     sleep_time = random.random()*10
     await asyncio.sleep(sleep_time)
     return val, sleep_time
