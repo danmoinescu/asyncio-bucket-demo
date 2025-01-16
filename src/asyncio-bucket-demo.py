@@ -3,7 +3,7 @@
 import asyncio
 import functools
 import random
-from collections.abc import Awaitable, Sequence
+from collections.abc import Awaitable, Iterable
 from typing import Any
 
 
@@ -30,16 +30,22 @@ async def worker(val: int) -> int:
 
 async def bucket_loop(
         async_job: Awaitable[[...], Any],
-        items: Sequence[Any],
+        items: Iterable[Any],
         bucket_size: int) -> list[Any]:
     loop = asyncio.get_running_loop()
     tasks = set()
     results = {}
+    item_iterator = iter(items)
+    have_more_items = True
 
-    for item in items[:bucket_size]:
-        tasks.add(loop.create_task(async_job(item)))
+    for i in range(0, bucket_size):
+        if have_more_items:
+            try:
+                tasks.add(loop.create_task(
+                            async_job(next(item_iterator))))
+            except StopIteration:
+                have_more_items = False
 
-    next_idx = bucket_size
     while tasks:
         done, pending = await asyncio.wait(
                 tasks, return_when=asyncio.FIRST_COMPLETED)
@@ -49,9 +55,12 @@ async def bucket_loop(
             results[result[0]] = result[1]
             print(f"task completed: {result}, {len(tasks)} task(s) remaining")
             tasks.remove(task)
-            if next_idx < len(items):
-                tasks.add(loop.create_task(async_job(items[next_idx])))
-                next_idx += 1
+            if have_more_items:
+                try:
+                    tasks.add(loop.create_task(
+                                async_job(next(item_iterator))))
+                except StopIteration:
+                    have_more_items = False
     return results
 
 if __name__ == "__main__":
