@@ -3,6 +3,8 @@
 import asyncio
 import functools
 import random
+from collections.abc import Awaitable, Sequence
+from typing import Any
 
 
 def log_when_starts(func):
@@ -26,14 +28,18 @@ async def worker(val: int) -> int:
     return val, sleep_time
 
 
-async def bucket_loop(max_items: int, bucket_size: int) -> list[tuple[int, float]]:
+async def bucket_loop(
+        async_job: Awaitable[[...], Any],
+        items: Sequence[Any],
+        bucket_size: int) -> list[Any]:
     loop = asyncio.get_running_loop()
     tasks = set()
     results = {}
 
-    for i in range(1, bucket_size+1):
-        tasks.add(loop.create_task(worker(i)))
+    for item in items[:bucket_size]:
+        tasks.add(loop.create_task(async_job(item)))
 
+    next_idx = bucket_size
     while tasks:
         done, pending = await asyncio.wait(
                 tasks, return_when=asyncio.FIRST_COMPLETED)
@@ -41,15 +47,18 @@ async def bucket_loop(max_items: int, bucket_size: int) -> list[tuple[int, float
         for task in done:
             result = task.result()
             results[result[0]] = result[1]
-            print(f"worker done: {result}, {len(tasks)} task(s) remaining")
+            print(f"task completed: {result}, {len(tasks)} task(s) remaining")
             tasks.remove(task)
-            if i < max_items:
-                i += 1
-                tasks.add(loop.create_task(worker(i)))
+            if next_idx < len(items):
+                tasks.add(loop.create_task(async_job(items[next_idx])))
+                next_idx += 1
     return results
 
 if __name__ == "__main__":
-    results = asyncio.run(bucket_loop(17, 5))
+    results = asyncio.run(
+            bucket_loop(
+                async_job=worker, items=range(1, 14), bucket_size=5))
+    print("Results:")
     for val, t in results.items():
         print(f"{val}: {t:.2f}")
 
