@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/python3 -Wall
 
 import asyncio
 import random
@@ -11,7 +11,7 @@ async def worker(val: int) -> int:
     return val, sleep_time
 
 
-async def bucket_loop(max_items: int, bucket_size: int) -> None:
+async def bucket_loop(max_items: int, bucket_size: int) -> list[tuple[int, float]]:
     loop = asyncio.get_running_loop()
     tasks = set()
     results = {}
